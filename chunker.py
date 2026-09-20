@@ -22,6 +22,7 @@ to it, write down what you saw, and move on. That's a real observation about
 your pipeline, not giving up.
 """
 
+import re
 from dataclasses import dataclass
 
 import config
@@ -80,24 +81,53 @@ def fallback_split(
     return chunks
 
 
+REPLY_DELIMITER = re.compile(r"^-{2,}\s*reply\s+\d+\s*\([^)]*\)\s*-{2,}\s*$", re.MULTILINE | re.IGNORECASE)
+
+def _windows(text: str, chunk_size: int, overlap: int) -> list[str]:
+    """Character windows, used only for the rare piece too long to embed whole."""
+    if len(text) <= chunk_size:
+        return [text]
+
+    pieces = []
+    start = 0
+    while start < len(text):
+        piece = text[start : start + chunk_size].strip()
+        if piece:
+            pieces.append(piece)
+        start += chunk_size - overlap
+    return pieces
+
+
 def split_documents(documents: list[Document]) -> list[Chunk]:
-    """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    chunks: list[Chunk] = []
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
+    for doc in documents:
+        head, *replies = REPLY_DELIMITER.split(doc.text)
+        title = head.strip()
+        bodies = [r.strip() for r in replies if r.strip()]
 
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
+        if bodies:
+            # Prefix each reply with the thread title so the chunk carries the
+            # question it is answering.
+            pieces = [f"{title}\n\n{body}" if title else body for body in bodies]
+        else:
+            # No reply markers: not a thread. Keep the document intact.
+            pieces = [doc.text.strip()] if doc.text.strip() else []
 
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
-    """
-    return fallback_split(documents)
+        index = 0
+        for piece in pieces:
+            for window in _windows(piece, config.CHUNK_SIZE, config.CHUNK_OVERLAP):
+                chunks.append(
+                    Chunk(
+                        text=window,
+                        source=doc.source,
+                        index=index,
+                        produced_by="chunker.py::split_documents",
+                    )
+                )
+                index += 1
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:

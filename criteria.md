@@ -23,6 +23,7 @@ For at least 4 of my 5 test questions, the retrieved chunks include one that
 contains the answer.
 
 **Why this target:**
+Questions are opinionated and can be subject - advice isn't always concrete.
 <!-- e.g. "One of my questions is about a topic only two documents mention, so
      I expect that one to be hard." -->
 
@@ -33,6 +34,8 @@ contains the answer.
 Every answer the system produces names at least one source document.
 
 **Why this target:**
+Ensures the model didn't hallucinate information. Users would also likely want a verifiable source
+to cross-reference.
 <!-- Why all five and not four? What about your setup makes that achievable —
      or what would have to go wrong for it not to be? -->
 
@@ -50,13 +53,15 @@ in at least 4 of 5 tries.
      just keep five of them, or the "4 of 5" above has nothing to be 4 of. -->
 
 **Why this target:**
+Ensures the model retrieves information we know and can verify.
 <!-- What did your distances look like when you set the cutoff in Milestone 4?
      Was there a clean gap, or did the two groups overlap? -->
 
 ---
 
 ## 4. Something about your chunks
-
+At least 4 of 5 sampled chunks contain exactly one full post or reply, including
+vote count and body text, without spilling over into adjacent replies.
 <!-- YOU WRITE THIS ONE.
 
      How would you know if your chunks were the right size? Name something
@@ -72,13 +77,14 @@ in at least 4 of 5 tries.
 
 
 **Why this target:**
-
+Ensures each chunk prevents mixing two separate replies that may contain differing advice.
 
 
 ---
 
 ## 5. Your choice
-
+Every answer includes the top-voted reply in an advice thread. If there are multiple replies
+tied for top-voted, include at most 3 of those replies.
 <!-- YOU WRITE THIS ONE TOO.
 
      Pick something you actually care about getting right. It could be about
@@ -90,7 +96,9 @@ in at least 4 of 5 tries.
 
 
 **Why this target:**
-
+Every advice thread with replies should have 1 or more top-voted replies, indicating most
+people agree with that reply. A user asking for advice from an AI model would likely
+want the most statistically agreeable advice.
 
 
 ---
