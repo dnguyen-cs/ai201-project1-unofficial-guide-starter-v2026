@@ -42,6 +42,7 @@ class Result:
     label: str
     distance: float   # LOWER IS BETTER. 0.3 is close, 0.9 is unrelated.
     produced_by: str
+    votes: int | None = None   # upvotes on the reply, when the corpus records them
 
 
 _model = None
@@ -134,6 +135,30 @@ def _client():
     )
 
 
+def _metadata(chunk: Chunk) -> dict:
+    """
+    What gets stored alongside a chunk, as opposed to embedded with it.
+
+    `votes` lives here rather than in the chunk text on purpose. Measured on
+    advice_threads, putting the vote count in the embedded text made in-corpus
+    matches slightly worse and narrowed the gap the relevance threshold sits
+    in, because "21 votes" and "8 votes" embed almost identically and no
+    question ever asks about them. As metadata it costs retrieval nothing and
+    still reaches the model at answer time.
+
+    Chroma rejects None outright, so the key is only present when the document
+    actually recorded a vote count.
+    """
+    meta = {
+        "source": chunk.source,
+        "index": chunk.index,
+        "produced_by": chunk.produced_by,
+    }
+    if chunk.votes is not None:
+        meta["votes"] = chunk.votes
+    return meta
+
+
 def build_index(
     chunks: list[Chunk],
     corpus: str | None = None,
@@ -169,10 +194,7 @@ def build_index(
             ids=[f"{c.source}#{c.index}" for c in window],
             documents=[c.text for c in window],
             embeddings=embed([c.text for c in window]),
-            metadatas=[
-                {"source": c.source, "index": c.index, "produced_by": c.produced_by}
-                for c in window
-            ],
+            metadatas=[_metadata(c) for c in window],
         )
 
     return len(chunks)
@@ -215,6 +237,7 @@ def search(
                 label=f"{meta.get('source', 'unknown')}#{meta.get('index', 0)}",
                 distance=float(distance),
                 produced_by=str(meta.get("produced_by", "unknown")),
+                votes=int(meta["votes"]) if meta.get("votes") is not None else None,
             )
         )
     return results

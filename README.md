@@ -21,26 +21,12 @@
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
-
-     Milestone 5. -->
+This is a Q/A chat bot that uses `advice_threads`, a corpus of 23 student discussion threads about university life. Each thread is one question with a few replies attached, and the replies frequently disagree with each other, so the useful information lives in an individual reply rather than in a thread as a whole. Every reply is embedded as its own chunk, retrieves the five closest to whatever you ask, and has a model answer using only that retrieved text while naming the files it came from. It is built for concrete questions the threads happen to answer, things like how late you can declare a course pass/fail, how many pages the printing quota covers, or when the dorm laundry rooms are least busy, and a relevance gate refuses anything the corpus does not cover instead of guessing.
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
-
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
-
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
-
-     Milestone 3. -->
+**Chunk size:** one reply per chunk.
+**Overlap:** none.
 
 ## Sample Chunks
 
@@ -74,7 +60,7 @@ The thing I'd say: the unwritten rules are the hard part, not the coursework. As
 ```
 THREAD: How much laptop do I actually need for CS courses?
 
-I did two years on an 8GB machine and it was fine until the last project, at which point it very much wasn't. 16 isthe answer.
+I did two years on an 8GB machine and it was fine until the last project, at which point it very much wasn't. 16 is the answer.
 ```
 
 **Chunk 4** — source: `thread_parking.txt#1` — produced by: `chunker.py::split_documents`
@@ -90,7 +76,7 @@ Street parking on Verrill is legal and free and unmarked, which is why half the 
 ```
 THREAD: Everyone says fix your sleep. Does it actually matter?
 
-The library being open until 2am is a trap. It's a resource, not a schedule
+The library being open until 2am is a trap. It's a resource, not a schedule.
 ```
 
 ## Sample Answer
@@ -99,14 +85,16 @@ The library being open until 2am is a trap. It's a resource, not a schedule
      visible. Milestone 4. -->
 
 **Question:**
+How much RAM should I get in a laptop for CS courses?
 
 **Answer:**
 
 ```
+You should get 16GB of RAM in a laptop for CS courses (thread_laptop_specs.txt).
 ```
 
 **My relevance cutoff:**
-
+0.6
 <!-- The number you set in config.py, and how you got there.
 
      You ran five questions your corpus covers and the five in OUT_OF_SCOPE
@@ -118,7 +106,20 @@ The library being open until 2am is a trap. It's a resource, not a schedule
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| How much RAM should I get in a laptop for CS courses? | Yes | 0.114 |
+| When are the dorm laundry rooms least busy? | Yes | 0.252 |
+| How late in the semester can I declare a course pass/fail? | Yes | 0.282 |
+| How many black and white pages does the printing quota cover? | Yes | 0.303 |
+| What should I do if I know I am going to hand an assignment in late? | Yes | 0.468 |
+| What is the recommended dosage of ibuprofen for a headache? | No | 0.819 |
+| How do I write a for loop in Rust? | No | 0.861 |
+| Who won the 1994 World Cup? | No | 0.898 |
+| What is the capital of Mongolia? | No | 0.899 |
+| How do I change the oil in a diesel engine? | No | 0.905 |
+
+The two groups don't overlap.
+In-corpus ranges from 0.114-0.468, out-of-corpus ranges from 0.819-0.905, and nothing lands in the 0.351 between them.
+I left the cutoff at 0.6 because it sits near the middle of that gap.
 
 ## How I Used AI
 
@@ -131,14 +132,28 @@ The library being open until 2am is a trap. It's a resource, not a schedule
 
      Milestone 5. -->
 
-**1.**
+**1.** I asked Claude to help me choose a chunk size and overlap for
+`advice_threads`. It measured the documents before answering, and came 
+back with the fact that all 23 of them are between 317 and 793 characters, 
+so `CHUNK_SIZE = 800` cuts almost nothing. I had it write a one-chunk-per-reply 
+scheme into `split_documents`. The part I questioned was whether reply 
+votes should be included in chunks.
 
-**2.**
+**2.** I used AI to help me fill in copy/paste information from the output console to README.md to save some time manually copy/pasting.
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
      claims earns nothing.
      ───────────────────────────────────────────────────────────────────────── -->
+
+## Stretch Feature: Metadata filtering by vote count
+
+I am doing the metadata filtering option from `RUNNING.md`, filtered on vote
+count rather than on source or date. Every chunk already carries the number of 
+upvotes its reply got, because criteria 4 and 5 needed it, so the filter has
+something real to work on without inventing a field. `store.py::search` will
+take an optional minimum vote count and pass it to Chroma as a `where` clause 
+on `collection.query`, and `app.py ask` will expose it as `--min-votes`.
 
 ---
 

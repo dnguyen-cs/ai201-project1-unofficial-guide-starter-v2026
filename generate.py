@@ -279,7 +279,24 @@ Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
 - If the documents don't cover the question, say you don't have enough information. Do not guess.
 - Name the document your answer came from, using the filename given in each excerpt.
+- An excerpt headed "N votes" is one reply that N people agreed with. When excerpts from the
+same document disagree, lead with what the highest-voted one says, and note the disagreement.
+- If you cannot name the document where the answer came from, say you don't have enough information and
+cannot find a document relevant to the question.
 - Be brief. Two or three sentences is usually enough."""
+
+
+def _excerpt_label(result) -> str:
+    """
+    How one retrieved chunk is introduced in the prompt.
+
+    The vote count is attached here rather than inside the chunk text, so the
+    model can weigh replies against each other without the number ever
+    reaching the embedding. See `store._metadata` for why that split exists.
+    """
+    if getattr(result, "votes", None) is None:
+        return result.source
+    return f"{result.source}, {result.votes} votes"
 
 
 def build_prompt(question: str, results) -> str:
@@ -292,7 +309,7 @@ def build_prompt(question: str, results) -> str:
     not the model, decides what an answer can possibly be based on.
     """
     context = "\n\n".join(
-        f"[from {r.source}]\n{r.text}" for r in results
+        f"[from {_excerpt_label(r)}]\n{r.text}" for r in results
     )
     return (
         f"Documents:\n\n{context}\n\n"

@@ -132,10 +132,13 @@ def cmd_chunks(args):
 
     for i, chunk in enumerate(sample, 1):
         print("=" * 70)
-        print(
+        header = (
             f"Chunk {i}  |  source: {chunk.source}#{chunk.index}  "
             f"|  produced by: {chunk.produced_by}"
         )
+        if chunk.votes is not None:
+            header += f"  |  votes: {chunk.votes}"
+        print(header)
         print("=" * 70)
         print(chunk.text)
         print()

@@ -37,6 +37,7 @@ class Chunk:
     source: str        # which file it came from
     index: int         # which chunk within that file, starting at 0
     produced_by: str   # the function that made it — cite this in your README
+    votes: int | None = None   # upvotes on the reply, when the document records them
 
     @property
     def label(self) -> str:
@@ -81,7 +82,13 @@ def fallback_split(
     return chunks
 
 
-REPLY_DELIMITER = re.compile(r"^-{2,}\s*reply\s+\d+\s*\([^)]*\)\s*-{2,}\s*$", re.MULTILINE | re.IGNORECASE)
+REPLY_DELIMITER = re.compile(r"^-{2,}\s*reply\s+\d+\s*\(([^)]*)\)\s*-{2,}\s*$", re.MULTILINE | re.IGNORECASE)
+
+def _parse_votes(marker: str) -> int | None:
+    """The number out of a `(21 votes)` marker, or None if there isn't one."""
+    found = re.search(r"\d+", marker)
+    return int(found.group()) if found else None
+
 
 def _windows(text: str, chunk_size: int, overlap: int) -> list[str]:
     """Character windows, used only for the rare piece too long to embed whole."""
@@ -102,20 +109,31 @@ def split_documents(documents: list[Document]) -> list[Chunk]:
     chunks: list[Chunk] = []
 
     for doc in documents:
-        head, *replies = REPLY_DELIMITER.split(doc.text)
+        head, *rest = REPLY_DELIMITER.split(doc.text)
         title = head.strip()
-        bodies = [r.strip() for r in replies if r.strip()]
 
-        if bodies:
+        # The capture group makes split return the votes too, so `rest` runs
+        # [votes, body, votes, body, ...].
+        replies = [
+            (_parse_votes(rest[i]), rest[i + 1].strip())
+            for i in range(0, len(rest) - 1, 2)
+            if rest[i + 1].strip()
+        ]
+
+        if replies:
             # Prefix each reply with the thread title so the chunk carries the
-            # question it is answering.
-            pieces = [f"{title}\n\n{body}" if title else body for body in bodies]
+            # question it is answering. The vote count deliberately stays out
+            # of the text and rides along as metadata instead.
+            pieces = [
+                (votes, f"{title}\n\n{body}" if title else body)
+                for votes, body in replies
+            ]
         else:
             # No reply markers: not a thread. Keep the document intact.
-            pieces = [doc.text.strip()] if doc.text.strip() else []
+            pieces = [(None, doc.text.strip())] if doc.text.strip() else []
 
         index = 0
-        for piece in pieces:
+        for votes, piece in pieces:
             for window in _windows(piece, config.CHUNK_SIZE, config.CHUNK_OVERLAP):
                 chunks.append(
                     Chunk(
@@ -123,6 +141,7 @@ def split_documents(documents: list[Document]) -> list[Chunk]:
                         source=doc.source,
                         index=index,
                         produced_by="chunker.py::split_documents",
+                        votes=votes,
                     )
                 )
                 index += 1
